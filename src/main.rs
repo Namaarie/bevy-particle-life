@@ -61,7 +61,6 @@ impl RuleSet {
 impl Default for RuleSet {
     fn default() -> RuleSet {
         let mut rs = RuleSet([[0.0; NUM_PARTICLES_TYPES]; NUM_PARTICLES_TYPES]);
-        rs.randomize();
         rs
     }
 }
@@ -108,7 +107,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
 
         commands.spawn((
             SpriteBundle {
-                transform: Transform::from_xyz(i as f32 / NUM_PARTICLES as f32 * 800.0 - 400.0, i as f32 / NUM_PARTICLES as f32 * 800.0 - 400.0, 0.0),
+                transform: Transform::from_xyz(rng.gen_range(-400.0..400.0), rng.gen_range(-400.0..400.0), 0.0),
                 sprite: Sprite {
                     color: color,
                     custom_size: Some(Vec2 { x: PARTICLE_SIZE, y: PARTICLE_SIZE }),
@@ -117,7 +116,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
                 texture: ball_tex.clone(),
                 ..default()
             },
-            Velocity(vec2(rng.gen::<f32>() * 2.0 - 1.0, rng.gen::<f32>() * 2.0 - 1.0)),
+            Velocity(vec2(0., 0.)),
             particle_type
         ));
         
