@@ -56,11 +56,16 @@ impl RuleSet {
             println!();
         }
     }
+
+    fn add_rule_symmetrical(&mut self, type1: ParticleType, type2: ParticleType, value: f32) {
+        self.0[usize::from(type1)][usize::from(type2)] = value;
+        self.0[usize::from(type2)][usize::from(type1)] = value;
+    }
 }
 
 impl Default for RuleSet {
     fn default() -> RuleSet {
-        let mut rs = RuleSet([[0.0; NUM_PARTICLES_TYPES]; NUM_PARTICLES_TYPES]);
+        let rs = RuleSet([[0.0; NUM_PARTICLES_TYPES]; NUM_PARTICLES_TYPES]);
         rs
     }
 }
@@ -71,7 +76,7 @@ struct FPSText;
 #[derive(Component, Default)]
 struct Velocity(Vec2);
 
-fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<ColorMaterial>>, asset_server: Res<AssetServer>, ruleset: Res<RuleSet>) {
+fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<ColorMaterial>>, asset_server: Res<AssetServer>, mut ruleset: ResMut<RuleSet>) {
     commands.spawn(Camera2dBundle::default());
     commands.spawn((TextBundle::from_section(
         "",
@@ -82,13 +87,17 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
         FPSText
     ));
 
+    ruleset.add_rule_symmetrical(ParticleType::BLUE, ParticleType::RED, 1.0);
+
+    ruleset.randomize();
+
     ruleset.print();
 
     let mut rng = rand::thread_rng();
 
     let ball_tex = asset_server.load("circle.png");
 
-    for i in 1..NUM_PARTICLES {
+    for _i in 1..NUM_PARTICLES {
         let particle_type;
         let color;
 
@@ -154,12 +163,12 @@ fn apply_forces_between_particles(
 
         let mut direction_vector = vec2(transform_other.translation.x - transform.translation.x, transform_other.translation.y - transform.translation.y);
 
-        let distance_squared = direction_vector.length_squared();
+        let distance = direction_vector.length();
         direction_vector = direction_vector.normalize();
 
         let ruleset_force = ruleset.0[usize::from(*particle_type)][usize::from(*particle_type_other)];
 
-        direction_vector *= ruleset_force * FORCE_MULTIPLIER / distance_squared;
+        direction_vector *= ruleset_force * FORCE_MULTIPLIER / distance;
 
         velocity.0 += direction_vector;
     }
