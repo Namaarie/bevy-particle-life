@@ -1,4 +1,6 @@
-use bevy::{prelude::*, sprite::MaterialMesh2dBundle, diagnostic::{FrameTimeDiagnosticsPlugin, DiagnosticsStore}, math::vec2};
+use bevy::{prelude::*, sprite::MaterialMesh2dBundle, diagnostic::{FrameTimeDiagnosticsPlugin, DiagnosticsStore}, math::vec2, window::PrimaryWindow};
+use bevy_egui::{EguiPlugin, egui, EguiContext};
+use bevy_inspector_egui::{quick::WorldInspectorPlugin, InspectorOptions, inspector_options::ReflectInspectorOptions};
 use rand::Rng;
 
 const NUM_PARTICLES_TYPES: usize = 3;
@@ -11,11 +13,15 @@ const FRICTION_HALF_LIFE: f32 = 0.02;
 fn main() {
     App::new()
         .add_plugins((DefaultPlugins, FrameTimeDiagnosticsPlugin))
+        .add_plugins(EguiPlugin)
+        .add_plugins(WorldInspectorPlugin::new())
         .init_resource::<RuleSet>()
+        .register_type::<RuleSet>()
         .add_systems(Startup, setup)
         .add_systems(Update, ui_system)
         .add_systems(FixedUpdate, apply_forces_between_particles)
         .add_systems(FixedUpdate, apply_movement.after(apply_forces_between_particles))
+        .add_systems(Update, ruleset_resource_inspector)
         .run();
 }
 
@@ -36,8 +42,12 @@ impl From<ParticleType> for usize {
     }
 }
 
-#[derive(Resource)]
-struct RuleSet([[f32; NUM_PARTICLES_TYPES]; NUM_PARTICLES_TYPES]);
+#[derive(Resource, Reflect, InspectorOptions)]
+#[reflect(Resource, InspectorOptions)]
+struct RuleSet(
+    #[inspector(min = -1.0, max = 1.0)]
+    [[f32; NUM_PARTICLES_TYPES]; NUM_PARTICLES_TYPES]
+);
 
 impl RuleSet {
     fn print(&self) {
@@ -215,6 +225,18 @@ fn apply_movement(mut particles: Query<(&mut Velocity, &mut Transform)>, time: R
             velocity.0.x *= -1.;
         }
     }
+}
+
+fn ruleset_resource_inspector(world: &mut World) {
+    let mut egui_context = world
+        .query_filtered::<&mut EguiContext, With<PrimaryWindow>>()
+        .single(world)
+        .clone();
+
+        egui::Window::new("Ruleset Inspector")
+        .show(egui_context.get_mut(), |ui| {
+            bevy_inspector_egui::bevy_inspector::ui_for_resource::<RuleSet>(world, ui);
+    });
 }
 
 fn ui_system(mut query: Query<&mut Text, With<FPSText>>, diag: Res<DiagnosticsStore>) {
