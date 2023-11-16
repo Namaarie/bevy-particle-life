@@ -66,17 +66,11 @@ impl Default for RuleSet {
     }
 }
 
-#[derive(Component, Default)]
-struct Direction {
-    x: f32,
-    y: f32,
-}
-
 #[derive(Component)]
 struct FPSText;
 
 #[derive(Component, Default)]
-struct Velocity(f32);
+struct Velocity(Vec2);
 
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<ColorMaterial>>, asset_server: Res<AssetServer>, ruleset: Res<RuleSet>) {
     commands.spawn(Camera2dBundle::default());
@@ -123,8 +117,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
                 texture: ball_tex.clone(),
                 ..default()
             },
-            Direction {x: rng.gen::<f32>() * 2.0 - 1.0, y: rng.gen::<f32>() * 2.0 - 1.0},
-            Velocity(100.0),
+            Velocity(vec2(rng.gen::<f32>() * 2.0 - 1.0, rng.gen::<f32>() * 2.0 - 1.0)),
             particle_type
         ));
         
@@ -147,14 +140,14 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
 }
 
 fn apply_forces_between_particles(
-    mut particles: Query<(Entity, &mut Direction, &mut Velocity, &mut Transform, &ParticleType)>,
+    mut particles: Query<(Entity, &mut Velocity, &mut Transform, &ParticleType)>,
     ruleset: Res<RuleSet>
     ) {
 
     let mut iter = particles.iter_combinations_mut();
 
-    while let Some([(entity, mut direction, _velocity, transform, particle_type),
-                    (entity_other, _direction_other, _velocity_other, transform_other, particle_type_other)
+    while let Some([(entity, mut velocity, transform, particle_type),
+                    (entity_other, _velocity_other, transform_other, particle_type_other)
                     ]) = iter.fetch_next() {
         if entity == entity_other {
             continue;
@@ -169,31 +162,30 @@ fn apply_forces_between_particles(
 
         direction_vector *= ruleset_force * FORCE_MULTIPLIER / distance_squared;
 
-        direction.x += direction_vector.x;
-        direction.y += direction_vector.y;
+        velocity.0 += direction_vector;
     }
 }
 
-fn apply_movement(time: Res<Time>, mut particles: Query<(&mut Direction, &mut Velocity, &mut Transform)>) {
-    for (mut direction, velocity, mut transform) in &mut particles {
-        transform.translation.y += direction.y * velocity.0 * time.delta_seconds();
+fn apply_movement(time: Res<Time>, mut particles: Query<(&mut Velocity, &mut Transform)>) {
+    for (mut velocity, mut transform) in &mut particles {
+        transform.translation.y += velocity.0.y * time.delta_seconds();
 
         if transform.translation.y > 450. {
             transform.translation.y = 450.;
-            direction.y *= -1.;
+            velocity.0.y *= -1.;
         } else if transform.translation.y < -450. {
             transform.translation.y = -450.;
-            direction.y *= -1.;
+            velocity.0.y *= -1.;
         }
 
-        transform.translation.x += direction.x * velocity.0 * time.delta_seconds();
+        transform.translation.x += velocity.0.x * time.delta_seconds();
 
         if transform.translation.x > 450. {
             transform.translation.x = 450.;
-            direction.x *= -1.;
+            velocity.0.x *= -1.;
         } else if transform.translation.x < -450. {
             transform.translation.x = -450.;
-            direction.x *= -1.;
+            velocity.0.x *= -1.;
         }
     }
 }
