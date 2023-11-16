@@ -4,7 +4,9 @@ use rand::Rng;
 const NUM_PARTICLES_TYPES: usize = 3;
 const NUM_PARTICLES: i32 = 500;
 const PARTICLE_SIZE:f32 = 10.0;
-const FORCE_MULTIPLIER: f32 = 1.0;
+const FORCE_MULTIPLIER: f32 = 50.0;
+const DISTANCE_MAX: f32 = 100.0;
+const FRICTION_HALF_LIFE: f32 = 0.02;
 
 fn main() {
     App::new()
@@ -147,9 +149,21 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
     });
 }
 
+fn force(r:f32, a:f32) -> f32 {
+    let beta = 0.3;
+    if r < beta {
+        return r / beta - 1.;
+    } else if beta < r && r < 1. {
+        return a * (1. - f32::abs(2. * r - 1. - beta) / (1. - beta));
+    } else {
+        return 0.;
+    }
+}
+
 fn apply_forces_between_particles(
     mut particles: Query<(Entity, &mut Velocity, &mut Transform, &ParticleType)>,
-    ruleset: Res<RuleSet>
+    ruleset: Res<RuleSet>,
+    time: Res<Time>
     ) {
 
     let mut iter = particles.iter_combinations_mut();
@@ -161,20 +175,25 @@ fn apply_forces_between_particles(
             continue;
         }
 
-        let mut direction_vector = vec2(transform_other.translation.x - transform.translation.x, transform_other.translation.y - transform.translation.y);
+        let dx = transform_other.translation.x - transform.translation.x;
+        let dy = transform_other.translation.y - transform.translation.y;
 
-        let distance = direction_vector.length();
-        direction_vector = direction_vector.normalize();
-
+        let distance = f32::hypot(dx, dy);
         let ruleset_force = ruleset.0[usize::from(*particle_type)][usize::from(*particle_type_other)];
 
-        direction_vector *= ruleset_force * FORCE_MULTIPLIER / distance;
+        if distance > 0. && distance < DISTANCE_MAX {
+            let force = force(distance / DISTANCE_MAX, ruleset_force);
+            
+            let mut partial_force = vec2(dx, dy) / distance * force;
 
-        velocity.0 += direction_vector;
+            partial_force *= DISTANCE_MAX * FORCE_MULTIPLIER;
+            velocity.0 *= f32::powf(0.5, time.delta_seconds() / FRICTION_HALF_LIFE);
+            velocity.0 += partial_force * time.delta_seconds();
+        }
     }
 }
 
-fn apply_movement(time: Res<Time>, mut particles: Query<(&mut Velocity, &mut Transform)>) {
+fn apply_movement(mut particles: Query<(&mut Velocity, &mut Transform)>, time: Res<Time>) {
     for (mut velocity, mut transform) in &mut particles {
         transform.translation.y += velocity.0.y * time.delta_seconds();
 
